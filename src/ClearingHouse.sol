@@ -25,9 +25,13 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
     uint256 public minMargin = 10e6; // 10 USDC (assuming 6 decimals)
     uint256 public maintenanceMarginRatio = 625; // 6.25% = 625 basis points
     uint256 public liquidationRewardRatio = 500; // 5% = 500 basis points
+    uint256 public minPositionSize = 1e15; // Minimum position size to prevent dust
 
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant PRECISION = 1e18;
+
+    // Protocol accounting
+    uint256 public protocolFees; // Accumulated fees from liquidations
 
     // User positions
     mapping(address => Position) public positions;
@@ -65,6 +69,9 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
         uint256 liquidationRewardRatio
     );
 
+    event ProtocolFeesCollected(uint256 amount);
+    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
+
     // ============ Errors ============
 
     error InvalidMargin();
@@ -75,6 +82,8 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
     error InsufficientPayout();
     error ZeroAddress();
     error SlippageExceeded();
+    error CannotSelfLiquidate();
+    error PositionSizeTooSmall();
 
     // ============ Constructor ============
 
@@ -119,6 +128,11 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
         // Slippage protection
         if (_minPositionSize > 0 && baseAmount < _minPositionSize) {
             revert SlippageExceeded();
+        }
+
+        // Minimum position size check (prevents dust positions)
+        if (baseAmount < minPositionSize) {
+            revert PositionSizeTooSmall();
         }
 
         // Calculate entry price
@@ -194,6 +208,9 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
      * @param _user Address of the position holder to liquidate
      */
     function liquidatePosition(address _user) external nonReentrant whenNotPaused {
+        // Prevent self-liquidation to avoid gaming the reward system
+        if (msg.sender == _user) revert CannotSelfLiquidate();
+        
         Position memory pos = positions[_user];
         if (pos.margin == 0) revert NoPositionExists();
 
@@ -225,6 +242,9 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
 
         // Calculate liquidator reward
         uint256 liquidatorReward = (remainingMargin * liquidationRewardRatio) / BASIS_POINTS;
+        
+        // Calculate protocol fee (remaining margin after liquidator reward)
+        uint256 protocolFee = remainingMargin - liquidatorReward;
 
         // Clear position
         delete positions[_user];
@@ -232,6 +252,12 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
         // Transfer reward to liquidator
         if (liquidatorReward > 0) {
             vault.withdraw(msg.sender, liquidatorReward);
+        }
+        
+        // Track protocol fees (stays in vault)
+        if (protocolFee > 0) {
+            protocolFees += protocolFee;
+            emit ProtocolFeesCollected(protocolFee);
         }
 
         emit PositionLiquidated(_user, msg.sender, pnl, liquidatorReward);
@@ -329,6 +355,28 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
         liquidationRewardRatio = _liquidationRewardRatio;
 
         emit ParametersUpdated(_maxLeverage, _minMargin, _maintenanceMarginRatio, _liquidationRewardRatio);
+    }
+
+    /**
+     * @notice Set minimum position size.
+     */
+    function setMinPositionSize(uint256 _minPositionSize) external onlyOwner {
+        minPositionSize = _minPositionSize;
+    }
+
+    /**
+     * @notice Withdraw accumulated protocol fees.
+     * @param _to Address to receive the fees
+     * @param _amount Amount to withdraw
+     */
+    function withdrawProtocolFees(address _to, uint256 _amount) external onlyOwner {
+        if (_to == address(0)) revert ZeroAddress();
+        require(_amount <= protocolFees, "Insufficient protocol fees");
+        
+        protocolFees -= _amount;
+        vault.withdraw(_to, _amount);
+        
+        emit ProtocolFeesWithdrawn(_to, _amount);
     }
 
     /**
