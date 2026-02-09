@@ -12,7 +12,7 @@ import "./interfaces/IVAMM.sol";
 contract VAMM is IVAMM, Ownable {
     uint256 public vBaseReserve;
     uint256 public vQuoteReserve;
-    uint256 public k;
+    uint256 public immutable k; // Gas optimization: k never changes after init
 
     address public clearingHouse;
 
