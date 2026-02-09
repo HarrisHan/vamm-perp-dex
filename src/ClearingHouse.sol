@@ -73,10 +73,15 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
     error NoPositionExists();
     error PositionNotLiquidatable();
     error InsufficientPayout();
+    error ZeroAddress();
+    error SlippageExceeded();
 
     // ============ Constructor ============
 
     constructor(address _vault, address _vamm, address _quoteAsset) Ownable(msg.sender) {
+        if (_vault == address(0) || _vamm == address(0) || _quoteAsset == address(0)) {
+            revert ZeroAddress();
+        }
         vault = IVault(_vault);
         vamm = IVAMM(_vamm);
         quoteAsset = IERC20(_quoteAsset);
@@ -89,11 +94,13 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
      * @param _margin Collateral amount in quote asset
      * @param _leverage Leverage multiplier (1 to maxLeverage)
      * @param _isLong true = long, false = short
+     * @param _minPositionSize Minimum acceptable position size (slippage protection, 0 to skip)
      */
     function openPosition(
         uint256 _margin,
         uint256 _leverage,
-        bool _isLong
+        bool _isLong,
+        uint256 _minPositionSize
     ) external nonReentrant whenNotPaused {
         // Validations
         if (_margin < minMargin) revert InvalidMargin();
@@ -108,6 +115,11 @@ contract ClearingHouse is Ownable, ReentrancyGuard, Pausable {
 
         // Execute vAMM swap
         uint256 baseAmount = vamm.swapInput(_isLong, notional);
+
+        // Slippage protection
+        if (_minPositionSize > 0 && baseAmount < _minPositionSize) {
+            revert SlippageExceeded();
+        }
 
         // Calculate entry price
         uint256 entryPrice = (notional * PRECISION) / baseAmount;

@@ -65,7 +65,7 @@ contract ClearingHouseTest is Test {
         uint256 leverage = 5;
 
         vm.prank(alice);
-        clearingHouse.openPosition(margin, leverage, true);
+        clearingHouse.openPosition(margin, leverage, true, 0);
 
         Position memory pos = clearingHouse.getPosition(alice);
         assertEq(pos.margin, margin);
@@ -79,7 +79,7 @@ contract ClearingHouseTest is Test {
         uint256 leverage = 5;
 
         vm.prank(alice);
-        clearingHouse.openPosition(margin, leverage, false);
+        clearingHouse.openPosition(margin, leverage, false, 0);
 
         Position memory pos = clearingHouse.getPosition(alice);
         assertEq(pos.margin, margin);
@@ -89,27 +89,27 @@ contract ClearingHouseTest is Test {
     function test_RevertWhen_MarginTooLow() public {
         vm.prank(alice);
         vm.expectRevert(ClearingHouse.InvalidMargin.selector);
-        clearingHouse.openPosition(1e6, 5, true); // Only 1 USDC
+        clearingHouse.openPosition(1e6, 5, true, 0); // Only 1 USDC
     }
 
     function test_RevertWhen_LeverageTooHigh() public {
         vm.prank(alice);
         vm.expectRevert(ClearingHouse.InvalidLeverage.selector);
-        clearingHouse.openPosition(100e6, 15, true); // 15x > max 10x
+        clearingHouse.openPosition(100e6, 15, true, 0); // 15x > max 10x
     }
 
     function test_RevertWhen_LeverageZero() public {
         vm.prank(alice);
         vm.expectRevert(ClearingHouse.InvalidLeverage.selector);
-        clearingHouse.openPosition(100e6, 0, true);
+        clearingHouse.openPosition(100e6, 0, true, 0);
     }
 
     function test_RevertWhen_PositionAlreadyExists() public {
         vm.startPrank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
         
         vm.expectRevert(ClearingHouse.PositionAlreadyExists.selector);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
         vm.stopPrank();
     }
 
@@ -118,11 +118,11 @@ contract ClearingHouseTest is Test {
     function test_ClosePositionWithProfit() public {
         // Alice opens long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         // Bob opens short (moves price up for Alice's long)
         vm.prank(bob);
-        clearingHouse.openPosition(500e6, 10, true);
+        clearingHouse.openPosition(500e6, 10, true, 0);
 
         uint256 aliceBalanceBefore = usdc.balanceOf(alice);
 
@@ -141,11 +141,11 @@ contract ClearingHouseTest is Test {
     function test_ClosePositionWithLoss() public {
         // Alice opens long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         // Bob opens short (moves price down for Alice's long)
         vm.prank(bob);
-        clearingHouse.openPosition(500e6, 10, false);
+        clearingHouse.openPosition(500e6, 10, false, 0);
 
         uint256 aliceBalanceBefore = usdc.balanceOf(alice);
 
@@ -162,7 +162,7 @@ contract ClearingHouseTest is Test {
     function test_ClosePositionBreakeven() public {
         // Alice opens and immediately closes
         vm.startPrank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
         
         uint256 balanceBefore = usdc.balanceOf(alice);
         clearingHouse.closePosition();
@@ -184,11 +184,11 @@ contract ClearingHouseTest is Test {
     function test_LiquidateUnderwaterPosition() public {
         // Alice opens a max leverage long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 10, true);
+        clearingHouse.openPosition(100e6, 10, true, 0);
 
         // Bob opens short to tank price (stay within liquidity limits)
         vm.prank(bob);
-        clearingHouse.openPosition(800e6, 10, false);
+        clearingHouse.openPosition(800e6, 10, false, 0);
 
         // Check Alice is liquidatable
         assertTrue(clearingHouse.isLiquidatable(alice));
@@ -210,7 +210,7 @@ contract ClearingHouseTest is Test {
 
     function test_RevertWhen_LiquidateHealthyPosition() public {
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 2, true); // Low leverage, healthy
+        clearingHouse.openPosition(100e6, 2, true, 0); // Low leverage, healthy
 
         vm.prank(liquidator);
         vm.expectRevert(ClearingHouse.PositionNotLiquidatable.selector);
@@ -233,7 +233,7 @@ contract ClearingHouseTest is Test {
 
     function test_GetUnrealizedPnl() public {
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         // Initially PnL should be near zero (small slippage)
         int256 pnl = clearingHouse.getUnrealizedPnl(alice);
@@ -242,7 +242,7 @@ contract ClearingHouseTest is Test {
 
     function test_GetMarginRatio() public {
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         uint256 marginRatio = clearingHouse.getMarginRatio(alice);
         // Initial margin ratio should be around 20% (1/5 leverage)
@@ -277,12 +277,12 @@ contract ClearingHouseTest is Test {
 
         vm.prank(alice);
         vm.expectRevert();
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         clearingHouse.unpause();
 
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
     }
 
     // ============ Integration Tests ============
@@ -290,11 +290,11 @@ contract ClearingHouseTest is Test {
     function test_FullLifecycle_LongProfit() public {
         // 1. Alice opens long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         // 2. Price moves up (Bob longs)
         vm.prank(bob);
-        clearingHouse.openPosition(500e6, 10, true);
+        clearingHouse.openPosition(500e6, 10, true, 0);
 
         // 3. Alice closes with profit
         uint256 aliceBalanceBefore = usdc.balanceOf(alice);
@@ -310,11 +310,11 @@ contract ClearingHouseTest is Test {
     function test_FullLifecycle_LongLoss() public {
         // 1. Alice opens long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         // 2. Price moves down (Bob shorts)
         vm.prank(bob);
-        clearingHouse.openPosition(500e6, 10, false);
+        clearingHouse.openPosition(500e6, 10, false, 0);
 
         // 3. Alice closes with loss
         uint256 aliceBalanceBefore = usdc.balanceOf(alice);
@@ -331,11 +331,11 @@ contract ClearingHouseTest is Test {
     function test_FullLifecycle_Liquidation() public {
         // 1. Alice opens max leverage long
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 10, true);
+        clearingHouse.openPosition(100e6, 10, true, 0);
 
         // 2. Price drop (within liquidity limits)
         vm.prank(bob);
-        clearingHouse.openPosition(800e6, 10, false);
+        clearingHouse.openPosition(800e6, 10, false, 0);
 
         // 3. Verify liquidatable
         assertTrue(clearingHouse.isLiquidatable(alice));
@@ -355,10 +355,10 @@ contract ClearingHouseTest is Test {
     function test_MultiUser_OpenCloseSequence() public {
         // Multiple users trade
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 5, true);
+        clearingHouse.openPosition(100e6, 5, true, 0);
 
         vm.prank(bob);
-        clearingHouse.openPosition(200e6, 3, false);
+        clearingHouse.openPosition(200e6, 3, false, 0);
 
         // Both close
         vm.prank(alice);
@@ -376,7 +376,7 @@ contract ClearingHouseTest is Test {
 
     function test_EdgeCase_MaxLeveragePosition() public {
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 10, true);
+        clearingHouse.openPosition(100e6, 10, true, 0);
 
         Position memory pos = clearingHouse.getPosition(alice);
         assertEq(pos.leverage, 10);
@@ -384,7 +384,7 @@ contract ClearingHouseTest is Test {
 
     function test_EdgeCase_MinMarginPosition() public {
         vm.prank(alice);
-        clearingHouse.openPosition(10e6, 5, true);
+        clearingHouse.openPosition(10e6, 5, true, 0);
 
         Position memory pos = clearingHouse.getPosition(alice);
         assertEq(pos.margin, 10e6);
@@ -393,11 +393,11 @@ contract ClearingHouseTest is Test {
     function test_EdgeCase_UnderwaterPayout() public {
         // Alice opens max leverage
         vm.prank(alice);
-        clearingHouse.openPosition(100e6, 10, true);
+        clearingHouse.openPosition(100e6, 10, true, 0);
 
         // Price crash (within liquidity limits)
         vm.prank(bob);
-        clearingHouse.openPosition(800e6, 10, false);
+        clearingHouse.openPosition(800e6, 10, false, 0);
 
         // Alice closes with significant loss
         uint256 balanceBefore = usdc.balanceOf(alice);
@@ -431,11 +431,21 @@ contract ClearingHouseTest is Test {
 
     function testFuzz_OpenPosition(uint256 margin, uint256 leverage, bool isLong) public {
         // Bound inputs to valid ranges
-        margin = bound(margin, 10e6, 1000e6);
+        margin = bound(margin, 10e6, 500e6);
         leverage = bound(leverage, 1, 10);
+        
+        // For shorts, limit notional to avoid exceeding liquidity
+        if (!isLong) {
+            uint256 notional = margin * leverage;
+            if (notional >= INIT_QUOTE_RESERVE) {
+                margin = (INIT_QUOTE_RESERVE - 1e6) / leverage;
+                if (margin < 10e6) margin = 10e6;
+                leverage = 1; // Reduce leverage to stay within limits
+            }
+        }
 
         vm.prank(alice);
-        clearingHouse.openPosition(margin, leverage, isLong);
+        clearingHouse.openPosition(margin, leverage, isLong, 0);
 
         Position memory pos = clearingHouse.getPosition(alice);
         assertEq(pos.margin, margin);

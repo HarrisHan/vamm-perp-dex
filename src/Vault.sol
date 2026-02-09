@@ -24,6 +24,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
     error OnlyClearingHouse();
     error InsufficientBalance();
+    error ZeroAddress();
 
     modifier onlyClearingHouse() {
         if (msg.sender != clearingHouse) revert OnlyClearingHouse();
@@ -38,6 +39,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
      * @notice Set the ClearingHouse address. Can only be called once by owner.
      */
     function setClearingHouse(address _clearingHouse) external onlyOwner {
+        if (_clearingHouse == address(0)) revert ZeroAddress();
         require(clearingHouse == address(0), "Already set");
         clearingHouse = _clearingHouse;
         emit ClearingHouseSet(_clearingHouse);

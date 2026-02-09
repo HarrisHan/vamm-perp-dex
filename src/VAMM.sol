@@ -26,6 +26,7 @@ contract VAMM is IVAMM, Ownable {
     error InvalidReserves();
     error ZeroAmount();
     error InsufficientLiquidity();
+    error ZeroAddress();
 
     modifier onlyClearingHouse() {
         if (msg.sender != clearingHouse) revert OnlyClearingHouse();
@@ -40,6 +41,7 @@ contract VAMM is IVAMM, Ownable {
     }
 
     function setClearingHouse(address _clearingHouse) external onlyOwner {
+        if (_clearingHouse == address(0)) revert ZeroAddress();
         require(clearingHouse == address(0), "Already set");
         clearingHouse = _clearingHouse;
         emit ClearingHouseSet(_clearingHouse);
@@ -106,6 +108,7 @@ contract VAMM is IVAMM, Ownable {
             // newBase = vBaseReserve - baseAmount
             // newQuote = k / newBase
             // quoteAmount = newQuote - vQuoteReserve
+            if (baseAmount >= vBaseReserve) revert InsufficientLiquidity();
             uint256 newBaseReserve = vBaseReserve - baseAmount;
             uint256 newQuoteReserve = k / newBaseReserve;
             quoteAmount = newQuoteReserve - vQuoteReserve;
@@ -146,6 +149,7 @@ contract VAMM is IVAMM, Ownable {
             uint256 newQuoteReserve = k / newBaseReserve;
             quoteAmount = vQuoteReserve - newQuoteReserve;
         } else {
+            if (baseAmount >= vBaseReserve) return type(uint256).max; // Indicates insufficient liquidity
             uint256 newBaseReserve = vBaseReserve - baseAmount;
             uint256 newQuoteReserve = k / newBaseReserve;
             quoteAmount = newQuoteReserve - vQuoteReserve;
